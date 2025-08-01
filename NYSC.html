@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bin Tracker App</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1, h2 { text-align: center; }
+        form { max-width: 800px; margin: 0 auto; }
+        label { display: block; margin-top: 10px; }
+        input[type="number"] { width: 60px; }
+        input[type="date"], input[type="month"] { width: 120px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        button { margin-top: 10px; padding: 8px; display: block; }
+        #report-section { margin-top: 40px; }
+        #monthly-report { white-space: pre-wrap; }
+        #edit-section { margin-top: 20px; }
+        #edit-data { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Bin Tracker App</h1>
+    
+    <form id="daily-form">
+        <label for="date">Date:</label>
+        <input type="date" id="date" required>
+        
+        <label for="hq-initial">Initial Clean Bins Picked Up at HQ:</label>
+        <input type="number" id="hq-initial" min="0" required>
+        
+        <h2>Locations</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Location</th>
+                    <th>Clean Bins Delivered</th>
+                    <th>Dirty Bins Picked Up</th>
+                </tr>
+            </thead>
+            <tbody id="locations-table">
+                <!-- Locations will be populated here -->
+            </tbody>
+        </table>
+        
+        <label for="end-dirty">Dirty Bins Returned After Route:</label>
+        <input type="number" id="end-dirty" min="0" required>
+        
+        <label for="end-transferred">Bins Transferred to Truck for Storage:</label>
+        <input type="number" id="end-transferred" min="0" required>
+        
+        <button type="submit">Save Daily Data</button>
+    </form>
+    
+    <div id="edit-section">
+        <h2>Edit Daily Data</h2>
+        <label for="edit-date">Select Date to Edit:</label>
+        <input type="date" id="edit-date">
+        <button id="load-data">Load Data</button>
+        <form id="edit-form" style="display: none;">
+            <h3>Edit Data for <span id="edit-date-display"></span></h3>
+            <label for="edit-hq-initial">Initial Clean Bins Picked Up at HQ:</label>
+            <input type="number" id="edit-hq-initial" min="0" required>
+            
+            <h4>Locations</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Location</th>
+                        <th>Clean Bins Delivered</th>
+                        <th>Dirty Bins Picked Up</th>
+                    </tr>
+                </thead>
+                <tbody id="edit-locations-table">
+                    <!-- Edit locations will be populated here -->
+                </tbody>
+            </table>
+            
+            <label for="edit-end-dirty">Dirty Bins Returned After Route:</label>
+            <input type="number" id="edit-end-dirty" min="0" required>
+            
+            <label for="edit-end-transferred">Bins Transferred to Truck for Storage:</label>
+            <input type="number" id="edit-end-transferred" min="0" required>
+            
+            <button type="submit">Update Data</button>
+            <button type="button" id="delete-data">Delete Data</button>
+        </form>
+    </div>
+    
+    <div id="report-section">
+        <h2>Monthly Report</h2>
+        <label for="month">Select Month (YYYY-MM):</label>
+        <input type="month" id="month" required>
+        <button id="generate-report">Generate Report</button>
+        <pre id="monthly-report"></pre>
+    </div>
+
+    <script>
+        const locations = [
+            "128 8th Ave.",
+            "113 E. 23rd St.",
+            "3 Park Avenue",
+            "23 W. 73rd St.",
+            "584 Columbus Avenue",
+            "2527 Broadway",
+            "1637 Third Avenue",
+            "349 E. 76th St.",
+            "633 Third Ave. (7AM-6PM only)"
+        ];
+
+        // Populate locations table for daily entry
+        const tableBody = document.getElementById('locations-table');
+        locations.forEach((loc, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${loc}</td>
+                <td><input type="number" class="clean-del" data-index="${index}" min="0" required></td>
+                <td><input type="number" class="dirty-pick" data-index="${index}" min="0" required></td>
+            `;
+            tableBody.appendChild(row);
+        });
+
+        // Populate locations table for editing
+        const editTableBody = document.getElementById('edit-locations-table');
+        locations.forEach((loc, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${loc}</td>
+                <td><input type="number" class="edit-clean-del" data-index="${index}" min="0" required></td>
+                <td><input type="number" class="edit-dirty-pick" data-index="${index}" min="0" required></td>
+            `;
+            editTableBody.appendChild(row);
+        });
+
+        // Load data from localStorage
+        let data = JSON.parse(localStorage.getItem('binTrackerData')) || {};
+
+        // Handle daily form submission
+        document.getElementById('daily-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const date = document.getElementById('date').value;
+            if (!date) return alert('Please select a date.');
+
+            const entry = {
+                hq_initial: parseInt(document.getElementById('hq-initial').value) || 0,
+                locations: {},
+                end_dirty: parseInt(document.getElementById('end-dirty').value) || 0,
+                end_transferred: parseInt(document.getElementById('end-transferred').value) || 0
+            };
+
+            locations.forEach((loc, index) => {
+                const clean = parseInt(document.querySelector(`.clean-del[data-index="${index}"]`).value) || 0;
+                const dirty = parseInt(document.querySelector(`.dirty-pick[data-index="${index}"]`).value) || 0;
+                entry.locations[loc] = { clean_delivered: clean, dirty_picked: dirty };
+            });
+
+            data[date] = entry;
+            localStorage.setItem('binTrackerData', JSON.stringify(data));
+            alert('Data saved for ' + date);
+            e.target.reset();
+        });
+
+        // Load data for editing
+        document.getElementById('load-data').addEventListener('click', () => {
+            const editDate = document.getElementById('edit-date').value;
+            if (!editDate) return alert('Please select a date to edit.');
+
+            const entry = data[editDate];
+            if (!entry) {
+                alert('No data found for ' + editDate);
+                document.getElementById('edit-form').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('edit-date-display').textContent = editDate;
+            document.getElementById('edit-hq-initial').value = entry.hq_initial;
+            document.getElementById('edit-end-dirty').value = entry.end_dirty;
+            document.getElementById('edit-end-transferred').value = entry.end_transferred;
+
+            locations.forEach((loc, index) => {
+                const locData = entry.locations[loc] || { clean_delivered: 0, dirty_picked: 0 };
+                document.querySelector(`.edit-clean-del[data-index="${index}"]`).value = locData.clean_delivered;
+                document.querySelector(`.edit-dirty-pick[data-index="${index}"]`).value = locData.dirty_picked;
+            });
+
+            document.getElementById('edit-form').style.display = 'block';
+        });
+
+        // Handle edit form submission
+        document.getElementById('edit-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const editDate = document.getElementById('edit-date').value;
+            if (!editDate) return alert('Please select a date.');
+
+            const entry = {
+                hq_initial: parseInt(document.getElementById('edit-hq-initial').value) || 0,
+                locations: {},
+                end_dirty: parseInt(document.getElementById('edit-end-dirty').value) || 0,
+                end_transferred: parseInt(document.getElementById('edit-end-transferred').value) || 0
+            };
+
+            locations.forEach((loc, index) => {
+                const clean = parseInt(document.querySelector(`.edit-clean-del[data-index="${index}"]`).value) || 0;
+                const dirty = parseInt(document.querySelector(`.edit-dirty-pick[data-index="${index}"]`).value) || 0;
+                entry.locations[loc] = { clean_delivered: clean, dirty_picked: dirty };
+            });
+
+            data[editDate] = entry;
+            localStorage.setItem('binTrackerData', JSON.stringify(data));
+            alert('Data updated for ' + editDate);
+            document.getElementById('edit-form').style.display = 'none';
+            document.getElementById('edit-date').value = '';
+        });
+
+        // Handle data deletion
+        document.getElementById('delete-data').addEventListener('click', () => {
+            const editDate = document.getElementById('edit-date').value;
+            if (!editDate) return alert('Please select a date to delete.');
+
+            if (data[editDate] && confirm('Are you sure you want to delete data for ' + editDate + '?')) {
+                delete data[editDate];
+                localStorage.setItem('binTrackerData', JSON.stringify(data));
+                alert('Data deleted for ' + editDate);
+                document.getElementById('edit-form').style.display = 'none';
+                document.getElementById('edit-date').value = '';
+            }
+        });
+
+        // Generate monthly report
+        document.getElementById('generate-report').addEventListener('click', () => {
+            const month = document.getElementById('month').value;
+            if (!month) return alert('Please select a month.');
+
+            const [year, mon] = month.split('-');
+            const report = { hq_initial: 0, end_dirty: 0, end_transferred: 0, locations: {} };
+            locations.forEach(loc => report.locations[loc] = { clean_delivered: 0, dirty_picked: 0 });
+
+            Object.keys(data).forEach(date => {
+                const [y, m] = date.split('-').slice(0, 2);
+                if (y === year && m === mon) {
+                    const entry = data[date];
+                    report.hq_initial += entry.hq_initial;
+                    report.end_dirty += entry.end_dirty;
+                    report.end_transferred += entry.end_transferred;
+                    Object.keys(entry.locations).forEach(loc => {
+                        report.locations[loc].clean_delivered += entry.locations[loc].clean_delivered;
+                        report.locations[loc].dirty_picked += entry.locations[loc].dirty_picked;
+                    });
+                }
+            });
+
+            let reportText = `Monthly Report for ${month}\n\n`;
+            reportText += `Total HQ Initial Clean Bins: ${report.hq_initial}\n`;
+            reportText += `Total Dirty Bins Returned: ${report.end_dirty}\n`;
+            reportText += `Total Bins Transferred to Truck: ${report.end_transferred}\n\n`;
+            reportText += 'Locations:\n';
+            Object.keys(report.locations).forEach(loc => {
+                const l = report.locations[loc];
+                reportText += `${loc}:\n  Clean Delivered: ${l.clean_delivered}\n  Dirty Picked Up: ${l.dirty_picked}\n`;
+            });
+
+            document.getElementById('monthly-report').textContent = reportText;
+        });
+    </script>
+</body>
+</html>
